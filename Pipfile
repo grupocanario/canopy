@@ -1,0 +1,26 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+jupyterlab = "*"
+
+[packages]
+pandas = "*"
+seaborn = "*"
+numpy = "*"
+pyarrow = "*"
+dagster = "*"
+dagit = "*"
+beautifulsoup4 = "*"
+dataset = "*"
+psycopg2 = "*"
+fuzzywuzzy = "*"
+python-levenshtein = "*"
+toolz = "*"
+unidecode = "*"
+nbstripout = "*"
+
+[requires]
+python_version = "3.8"
