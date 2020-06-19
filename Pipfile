@@ -21,6 +21,12 @@ python-levenshtein = "*"
 toolz = "*"
 unidecode = "*"
 nbstripout = "*"
+scikit-learn = "*"
+feather-format = "*"
+gensim = "*"
+spacy = "*"
+spacy-lookups-data = "*"
+nltk = "*"
 
 [requires]
 python_version = "3.8"

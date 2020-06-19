@@ -1,0 +1,63 @@
+---
+title: "Distribution observations"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(feather)
+```
+
+```{r}
+secop = read_csv(here("data", "secop_union_all.csv"), guess_max = 0)
+```
+
+```{r}
+secop_1 = read_csv(here("data", "secop_1.csv"), guess_max = 10000)
+```
+
+```{r}
+secop_1%>%
+  count(modalidad_de_contratacion)%>%
+  arrange(desc(n))
+```
+
+
+
+```{r}
+secop%>%
+  filter(source=='secop_2')%>%
+  count(modalidad_de_contratacion)%>%
+  arrange(desc(n))
+```
+
+
+```{r}
+secop%>%
+  count(modalidad_de_contratacion, is_covid)%>%
+  group_by(is_covid)%>%
+  mutate(p=n/sum(n))%>%
+  
+  ggplot(aes(modalidad_de_contratacion, p, fill=is_covid))+
+  geom_col(position = "dodge")+coord_flip()
+```
+
+
+```{r}
+secop%>%
+  filter(is_covid=="False")%>%
+  filter(modalidad_de_contratacion=="Contratación directa")
+```
+
+
+```{r}
+secop%>%
+  
+  ggplot(aes(modalidad_de_contratacion))+
+  geom_bar()+
+  coord_flip()+
+  facet_wrap(~is_covid)
+```
+
+
