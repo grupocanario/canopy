@@ -1,5 +1,13 @@
-from dagster import RepositoryDefinition, ScheduleDefinition
-from pipelines import sobrecostos_pipeline
+import os
+import sys
+
+SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(SCRIPT_PATH)
+
+from dagster import repository, ScheduleDefinition  # noqa
+from pipelines import (
+    sobrecostos_pipeline,
+    data_collection_pipeline)  # noqa
 
 
 def pipeline_function(pipeline):
@@ -7,14 +15,13 @@ def pipeline_function(pipeline):
 
 
 pipeline_list = [
+    data_collection_pipeline,
     sobrecostos_pipeline
 ]
 
-pipeline_dict = {p.name: pipeline_function(p) for p in pipeline_list}
+# pipeline_dict = {p.name: pipeline_function(p) for p in pipeline_list}
 
 
-def define_repo():
-    return RepositoryDefinition(
-        name='wendy_pipelines_repo',
-        pipeline_dict=pipeline_dict
-    )
+@repository
+def canopy_repo():
+    return pipeline_list

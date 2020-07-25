@@ -27,6 +27,7 @@ gensim = "*"
 spacy = "*"
 spacy-lookups-data = "*"
 nltk = "*"
+dagster-shell = "*"
 
 [requires]
 python_version = "3.8"

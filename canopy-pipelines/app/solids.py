@@ -1,61 +1,151 @@
-from dagster import solid, Field
-import requests
+import os
+from dagster import (
+    solid,
+    Field,
+    Enum,
+    EnumValue,
+    Failure,
+    InputDefinition,
+    Noneable,
+    Nothing,
+    OutputDefinition,
+    Permissive,)
+from dagster_shell.utils import execute
 import pandas as pd
 from custom_types import PandasDataFrame
+from utils import without_keys
 from datetime import datetime
-from alarms.costs import ItemFinderSecop2, ReferenceItemMatcher
+from alarms.costs import ReferenceItemMatcher
 from text_processing import TextPreprocessor
 
 
-@solid
-def load_secop_1_data(context):
-    url_secop_i = 'https://www.datos.gov.co/resource/c82b-7jfi.json'
-    p_secop_i = {'$limit': '1000000',
-                 'anno_firma_del_contrato': '2020'}
-    r_secop_i = requests.get(url_secop_i, params=p_secop_i)
-    d_secop_i = r_secop_i.json()  # To .json
-    secop_1 = pd.DataFrame(d_secop_i)  # To df
-
-    return secop_1
-
-
-@solid
-def load_secop_2_data(context):
-    url_secop_ii = "https://www.datos.gov.co/resource/jbjy-vk9h.json?$where=fecha_de_firma>='2020-01-01'"
-    p_secop_ii = {'$limit': '1000000'}
-    r_secop_ii = requests.get(url_secop_ii, params=p_secop_ii)
-    d_secop_ii = r_secop_ii.json()  # To .json
-    secop_2 = pd.DataFrame(d_secop_ii)  # To df
-
-    return secop_2
-
-
-@solid
-def clean_secop_1(context, secop_1_raw):
-    secop_1 = secop_1_raw
-    secop_1['source'] = 'secop_2'
-
-    return secop_1
-
-
-def clean_secop_2(context, secop_2_raw):
-    secop_2 = secop_2_raw
-    secop_2['source'] = 'secop_2'
-
-    return secop_2
+def shell_solid_config():
+    return {
+        'env': Field(
+            Noneable(Permissive()),
+            default_value=os.environ.copy(),
+            is_required=False,
+            description='An optional dict of environment variables to pass to the subprocess. '
+            'Defaults to using os.environ.copy().',
+        ),
+        'output_logging': Field(
+            Enum(
+                name='OutputType',
+                enum_values=[
+                    EnumValue('STREAM', description='Stream script stdout/stderr.'),
+                    EnumValue(
+                        'BUFFER',
+                        description='Buffer shell script stdout/stderr, then log upon completion.',
+                    ),
+                    EnumValue('NONE', description='No logging'),
+                ],
+            ),
+            is_required=False,
+            default_value='STREAM',
+        ),
+        'cwd': Field(
+            Noneable(str),
+            default_value=None,
+            is_required=False,
+            description='Working directory in which to execute shell script',
+        ),
+    }
 
 
-def save_secop(context, secop_data: PandasDataFrame) -> PandasDataFrame:
-    # select common columns
-    pass
+@solid(
+        input_defs=[InputDefinition('start', Nothing)],
+        output_defs=[OutputDefinition(str, 'result')],
+        config_schema={
+            **shell_solid_config(),
+            'from_date': Field(str, is_required=True)
+        },
+)
+def collect_releases(context):
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.join(app_dir, 'shell', 'kingfisher-collect.sh')
+
+    from_date = context.solid_config.get('from_date')
+
+    shell_command = 'bash {} {}'.format(
+        script_path,
+        from_date)
+
+    output, return_code = execute(
+        shell_command=shell_command, log=context.log, **without_keys(context.solid_config, ['from_date'])
+    )
+
+    if return_code:
+        raise Failure(
+            description='Shell command execution failed with output: {output}'.format(
+                output=output
+            )
+        )
+
+    return output
 
 
-@solid
-def extract_items_secop_2(context, secop_2: PandasDataFrame) -> PandasDataFrame:
-    finder = ItemFinderSecop2()
-    secop_2['items'] = secop_2.url.apply(lambda url: finder.find_items(url))
+@solid(
+        input_defs=[InputDefinition('start', Nothing)],
+        output_defs=[OutputDefinition(str, 'result')],
+        config_schema={
+            **shell_solid_config(),
+            'collection_id': Field(int, is_required=True)
+        },
+)
+def process_releases(context):
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.join(app_dir, 'shell', 'kingfisher-process.sh')
 
-    return secop_2
+    collection_id = context.solid_config.get('collection_id')
+
+    shell_command = 'bash {} {}'.format(
+        script_path,
+        collection_id)
+
+    output, return_code = execute(
+        shell_command=shell_command, log=context.log, **without_keys(context.solid_config, ['collection_id'])
+    )
+
+    if return_code:
+        raise Failure(
+            description='Shell command execution failed with output: {output}'.format(
+                output=output
+            )
+        )
+
+    return output
+
+
+@solid(
+        input_defs=[InputDefinition('start', Nothing)],
+        output_defs=[OutputDefinition(str, 'result')],
+        config_schema={
+            **shell_solid_config(),
+            'view_name': Field(str, is_required=True)
+        },
+)
+def refresh_views(context):
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.join(app_dir, 'shell', 'kingfisher-views.sh')
+
+    view_name = context.solid_config.get('view_name')
+
+    shell_command = 'bash {} {}'.format(
+        script_path,
+        view_name)
+
+    output, return_code = execute(
+        shell_command=shell_command, log=context.log, **without_keys(context.solid_config, ['view_name'])
+    )
+
+    if return_code:
+        raise Failure(
+            description='Shell command execution failed with output: {output}'.format(
+                output=output
+            )
+        )
+
+    return output
 
 
 # Items Alarm
@@ -66,48 +156,7 @@ def load_items_reference_db(context):
 
 
 @solid(
-    config={
-        'batch_size': Field(
-            int,
-            default_value=100,
-            is_required=False,
-            description='Number of contracts to process')
-    }
-)
-def load_secop_join(context):
-    batch_size = context.solid_config.get('batch_size')
-
-    context.log.info('loading secop items')
-    secop_2_items = pd.read_pickle('https://storage.googleapis.com/secop_data/secop_2_covid_items.pickle')
-
-    context.log.info('loading secop data')
-    secop_2_covid = pd.read_pickle('https://storage.googleapis.com/secop_data/secop_2_covid.pickle')
-    # secop_2_covid = secop_covid.loc[lambda x: (x.is_covid) & (x.source == 'secop_2')].copy()
-    secop_2_covid = secop_2_covid.sample(n=batch_size)
-
-    context.log.info('joining tables')
-    secop_join = pd.merge(
-        secop_2_covid,
-        secop_2_items,
-        how='left',
-        on='id_contrato'
-    )
-
-    secop_join = secop_join[['nombre_entidad', 'nit_entidad', 'departamento', 'ciudad',
-                             'proceso_de_compra', 'id_contrato',
-                             'descripcion_del_proceso', 'tipo_de_contrato',
-                             'modalidad_de_contratacion',
-                             'documento_proveedor', 'proveedor_adjudicado',
-                             'url',
-                             'valor_del_contrato',
-                             'item_code', 'item_description', 'item_quantity',
-                             'item_unit', 'item_price']]
-
-    return secop_join
-
-
-@solid(
-    config={
+    config_schema={
         'score_cutoff': Field(
             int,
             default_value=70,
