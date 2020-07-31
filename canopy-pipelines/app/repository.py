@@ -6,7 +6,6 @@ sys.path.append(SCRIPT_PATH)
 
 from dagster import repository, ScheduleDefinition  # noqa
 from pipelines import (
-    sobrecostos_pipeline,
     data_collection_pipeline)  # noqa
 
 
@@ -15,8 +14,7 @@ def pipeline_function(pipeline):
 
 
 pipeline_list = [
-    data_collection_pipeline,
-    sobrecostos_pipeline
+    data_collection_pipeline
 ]
 
 # pipeline_dict = {p.name: pipeline_function(p) for p in pipeline_list}

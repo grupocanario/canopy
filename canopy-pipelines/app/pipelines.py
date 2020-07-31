@@ -1,22 +1,27 @@
-from dagster import pipeline
+from dagster import pipeline, ModeDefinition, PresetDefinition
 from solids import (
-    collect_releases, process_releases, refresh_views,
-    load_items_reference_db,
-    load_secop_join,
-    process_alarm_sobrecosto,
-    save_alarm_sobrecosto
+    collect_releases, process_releases, log_data_collection
+)
+from resources import ocds_loader_resource
+
+
+# Mode definitions
+default_mode = ModeDefinition(
+    name='default',
+    resource_defs={
+        'ocds_loader': ocds_loader_resource,
+    }
 )
 
+default_preset = PresetDefinition(name='default_preset', mode='default')
 
-@pipeline
+
+@pipeline(
+    mode_defs=[default_mode],
+    preset_defs=[default_preset]
+)
 def data_collection_pipeline():
-    refresh_views(process_releases(collect_releases()))
+    log_data_collection(process_releases(collect_releases()))
 
 
-@pipeline
-def sobrecostos_pipeline():
-    precios_reference = load_items_reference_db()
-    secop_join = load_secop_join()
-
-    save_alarm_sobrecosto(process_alarm_sobrecosto(secop_join, precios_reference))
 

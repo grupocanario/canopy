@@ -17,6 +17,7 @@ from utils import without_keys
 from datetime import datetime
 from alarms.costs import ReferenceItemMatcher
 from text_processing import TextPreprocessor
+from resources import OCDSLoader
 
 
 def shell_solid_config():
@@ -57,18 +58,26 @@ def shell_solid_config():
         output_defs=[OutputDefinition(str, 'result')],
         config_schema={
             **shell_solid_config(),
-            'from_date': Field(str, is_required=True)
+            'from_date': Field(str, is_required=False)
         },
+        required_resource_keys={'ocds_loader'}
 )
 def collect_releases(context):
+    ocds_loader: OCDSLoader = context.resources.ocds_loader
+    last_loading = ocds_loader.get_last_data_loading_records(n_records=1).iloc[0]
+
     app_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(app_dir, 'shell', 'kingfisher-collect.sh')
 
     from_date = context.solid_config.get('from_date')
 
+    last_item_date = last_loading.last_item_date
+
+    start_date = from_date or last_item_date.strftime('%Y-%m-%d')
+
     shell_command = 'bash {} {}'.format(
         script_path,
-        from_date)
+        start_date)
 
     output, return_code = execute(
         shell_command=shell_command, log=context.log, **without_keys(context.solid_config, ['from_date'])
@@ -146,6 +155,30 @@ def refresh_views(context):
         )
 
     return output
+
+
+@solid(
+    input_defs=[InputDefinition('start', Nothing)],
+    required_resource_keys={'ocds_loader'},
+)
+def log_data_collection(context):
+    ocds_loader: OCDSLoader = context.resources.ocds_loader
+    current_last_item_date = ocds_loader.get_last_item_date()
+
+    data_collection_record = {
+        'last_item_date': current_last_item_date,
+        'timestamp': datetime.now()}
+
+    return ocds_loader.log_data_collection(data_collection_record)
+
+
+@solid(
+    required_resource_keys={'ocds_loader'},
+)
+def get_last_data_loadings(context):
+    ocds_loader: OCDSLoader = context.resources.ocds_loader
+    last_loadings = ocds_loader.get_last_data_loading_records(n_records=2)
+    return last_loadings
 
 
 # Items Alarm
